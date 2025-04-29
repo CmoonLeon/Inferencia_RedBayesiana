@@ -1,0 +1,85 @@
+#importaciones
+import matplotlib.pyplot as plt
+import networkx as nx
+from pgmpy.models import DiscreteBayesianNetwork
+from pgmpy.factors.discrete import TabularCPD
+from pgmpy.inference import VariableElimination
+
+#Definición de la red Bayesiana
+modelo = DiscreteBayesianNetwork([
+    ('Nublado', 'Lluvia'),
+    ('Nublado', 'Aspersor'),
+    ('Lluvia', 'CespedMojado'),
+    ('Aspersor', 'CespedMojado')
+])
+
+#Definición de tablas de Probabilidad
+# 0.7 de prob que NO esté nublado
+# 0.3 de prob que SI esté nublado
+tp_nublado = TabularCPD(
+    variable='Nublado',
+    variable_card=2,
+    values=[[0.7],[0.3]]
+    )
+
+tp_lluvia = TabularCPD(
+    variable='Lluvia',
+    variable_card=2,
+    values=[[0.8, 0.2], [0.2, 0.8]],
+    evidence=['Nublado'],
+    evidence_card=[2]
+    )
+
+tp_aspersor = TabularCPD(
+    variable='Aspersor',
+    variable_card=2,
+    values=[[0.9, 0.1], [0.1, 0.9]],
+    evidence=['Nublado'],
+    evidence_card=[2]
+    )
+
+tp_cesped = TabularCPD(
+    variable='CespedMojado',
+    variable_card=2,
+    values=[[1.0, 0.1, 0.1, 0.01], [0.0, 0.9, 0.9, 0.99]],
+    evidence= ['Lluvia', 'Aspersor'],
+    evidence_card=[2,2]
+    )
+
+modelo.add_cpds(tp_nublado, tp_lluvia, tp_aspersor, tp_cesped)
+
+modelo.check_model()
+
+#visualizar la red
+G = nx.DiGraph()
+G.add_nodes_from(modelo.nodes)
+G.add_edges_from(modelo.edges)
+
+plt.figure(figsize=(8,6))
+pos = nx.spring_layout(G, seed=42)
+nx.draw(G, pos, with_labels=True,
+        node_color='skyblue',
+        node_size=2000,
+        font_size=12,
+        font_weight='bold',
+        arrows=True,
+        arrowstyle='-|>',
+        arrowsize=20)
+plt.title("Red Bayesiana del Clima")
+
+#Inferencia
+inferencia = VariableElimination(modelo)
+
+resultado = inferencia.query(
+    variables=['Nublado'],
+    evidence={'Lluvia': 0, 'Aspersor': 1}
+)
+print("La probabilidad de que el cesped esté mojado dado que está nublado: ")
+print(resultado)
+
+resultado = inferencia.query(
+    variables=['CespedMojado'],
+    evidence={'Lluvia': 1, 'Aspersor': 1}
+)
+print("La probabilidad de que haya llovido dado que el cesped está mojado: ")
+print(resultado)
